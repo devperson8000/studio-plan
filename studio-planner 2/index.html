@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Planner</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif;background:#111;color:#eee;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.p{position:fixed;background:#1b1d24ee;border:1px solid #333;border-radius:10px;padding:10px;max-height:calc(100vh - 20px);overflow:auto}
+#L{left:10px;top:10px;width:170px}#R{right:10px;top:10px;width:210px}
+h4{margin:8px 0 6px;font-size:12px;text-transform:uppercase;color:#9aa}h4:first-child{margin-top:0}
+button{background:#2b2f3a;color:#eee;border:1px solid #444;border-radius:6px;padding:6px 8px;margin:2px 2px 2px 0;cursor:pointer;font-size:13px}
+button:hover{background:#3a4050}#L button{display:block;width:100%;text-align:left}
+label{display:block;margin:5px 0;font-size:13px}select{width:100%;background:#2b2f3a;color:#eee;border:1px solid #444;border-radius:6px;padding:5px}input[type=range]{width:100%}input[type=color]{width:100%;height:28px;border:0;padding:0}
+#msg{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#000a;padding:6px 12px;border-radius:8px}
+@media(max-width:700px){#L{width:120px}#R{width:150px}}
+</style></head><body>
+<canvas id="c"></canvas><div id="msg">Loading studio…</div>
+<div class="p" id="L"><h4>Quick start</h4><button id="setup">★ Gaming setup</button><h4>Add item</h4></div>
+<div class="p" id="R">
+<h4>View</h4><button data-v="top">Top</button><button data-v="deck">Deck</button><button data-v="in">Inside</button>
+<label><input type="checkbox" id="roof"> Show roof &amp; ceiling</label>
+<h4>Room lighting</h4>
+<label>Day ↔ Night<input type="range" id="night" min="0" max="1" step="0.01" value="0.2"></label>
+<label>Global RGB colour<input type="color" id="acc" value="#8a2be2"></label>
+<label>RGB mode<select id="mode"><option value="s">Static</option><option value="r">Rainbow cycle</option></select></label>
+<label>Fan speed<input type="range" id="fs" min="0" max="2" step="0.05" value="1"></label>
+<h4>Selected item</h4>
+<label>Body colour<input type="color" id="ic" value="#222222"></label>
+<label>This item's RGB<input type="color" id="ia" value="#8a2be2"></label><button id="ar">Use global RGB</button>
+<label>Width<input type="range" id="sw" min="0.3" max="2.5" step="0.05" value="1"></label>
+<label>Height<input type="range" id="sh" min="0.3" max="2.5" step="0.05" value="1"></label>
+<label>Depth<input type="range" id="sd" min="0.3" max="2.5" step="0.05" value="1"></label>
+<label>Lift off floor<input type="range" id="se" min="0" max="2" step="0.01" value="0"></label>
+<button id="r15">⟳ 15°</button><button id="r90">⟳ 90°</button><button id="dup">Copy</button><button id="del">Delete</button>
+<p style="color:#9aa;font-size:12px;margin:6px 0">Drag to move. R = rotate, Del = remove. Lift a monitor to 0.77 to sit it on a desk.</p>
+<h4>Layout</h4><button id="save">Save</button><button id="load">Load</button><button id="clr">Clear</button>
+</div>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from './vendor/controls/OrbitControls.js';
+import {ColladaLoader} from './vendor/loaders/ColladaLoader.js';
+const FY=0.55,XMIN=0.05,XMAX=3.35,ZMIN=-9.55,ZMAX=-2.85,PI=Math.PI;
+const cv=document.getElementById('c'),$=id=>document.getElementById(id);
+const rd=new THREE.WebGLRenderer({canvas:cv,antialias:true});rd.setPixelRatio(Math.min(devicePixelRatio,2));
+rd.shadowMap.enabled=true;rd.toneMapping=THREE.ACESFilmicToneMapping;
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,200);
+const oc=new OrbitControls(cam,cv);oc.enableDamping=true;oc.maxPolarAngle=PI*0.499;
+const hemi=new THREE.HemisphereLight(0xffffff,0x556655,1),sun=new THREE.DirectionalLight(0xfff2dd,2.2);
+sun.position.set(-8,14,4);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,far:40});
+const ceilL=new THREE.PointLight(0xfff0dd,0,12,1.5);ceilL.position.set(1.7,3,-6);
+sc.add(hemi,sun,ceilL,sun.target);sun.target.position.set(1.7,0,-5);
+function view(v){const P={top:[[1.7,14,-3.8],[1.7,0,-5.6]],deck:[[-6.5,2.6,-8.5],[1.7,1,-6.5]],in:[[1.7,1.8,-3],[1.7,0.9,-9]]}[v];cam.position.set(...P[0]);oc.target.set(...P[1])}
+view('top');
+let roofNodes=[];
+new ColladaLoader().load('./Studio_Model.dae',c=>{c.scene.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true;if(['Roof','Ceiling'].includes(o.name))roofNodes.push(o)});
+ sc.add(c.scene);$('msg').remove();setRoof()},undefined,()=>{$('msg').textContent='Could not load model (use a web server, not file://)'});
+const setRoof=()=>roofNodes.forEach(o=>o.visible=$('roof').checked);$('roof').onchange=setRoof;
+// ---------- helpers ----------
+let accent=new THREE.Color('#8a2be2'),cur=null;
+const mat=(c,r=.55,m=.15)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const am=()=>{const m=new THREE.MeshStandardMaterial({color:0,emissive:0xffffff,emissiveIntensity:1.6});cur.am.push(m);return m};
+function B(g,w,h,d,x,y,z,c,n){const a=c==='acc',m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),a?am():mat(c));
+ m.position.set(x,y+h/2,z);m.castShadow=m.receiveShadow=true;if(!a&&!n)m.userData.t=1;g.add(m);return m}
+function glow(g,x,y,z,k=1){const l=new THREE.PointLight(0xffffff,0,5,2);l.userData.k=k;l.position.set(x,y,z);g.add(l);cur.al.push(l)}
+function fan(g,x,y,z,r=.055,ry=0){const p=new THREE.Group();p.position.set(x,y,z);p.rotation.y=ry;g.add(p);
+ p.add(new THREE.Mesh(new THREE.BoxGeometry(r*2.1,r*2.1,.02),mat('#0b0b0e')));
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(r*.93,.005,8,28),am());ring.position.z=.011;p.add(ring);
+ const s=new THREE.Group();s.position.z=.013;p.add(s);
+ for(let i=0;i<7;i++){const a=i/7*PI*2,b=new THREE.Mesh(new THREE.BoxGeometry(.022,r*.78,.003),mat('#2c2c36'));
+  b.position.set(-Math.sin(a)*r*.48,Math.cos(a)*r*.48,0);b.rotation.z=a;s.add(b)}
+ const h=new THREE.Mesh(new THREE.CylinderGeometry(r*.24,r*.24,.01,18),am());h.rotation.x=PI/2;s.add(h);cur.sp.push(s)}
+function ring(g,x,y,z,r,ry){const t=new THREE.Mesh(new THREE.TorusGeometry(r,.004,8,24),am());t.position.set(x,y,z);t.rotation.y=ry;g.add(t)}
+// curved ultrawide screen texture
+const c2=document.createElement('canvas');c2.width=400;c2.height=170;const stex=new THREE.CanvasTexture(c2);stex.colorSpace=THREE.SRGBColorSpace;
+function drawScreen(){const x=c2.getContext('2d'),g=x.createLinearGradient(0,0,400,170);g.addColorStop(0,'#05040c');g.addColorStop(.5,'#'+accent.getHexString());g.addColorStop(1,'#020a1a');
+ x.fillStyle=g;x.fillRect(0,0,400,170);x.fillStyle='#000a';x.fillRect(14,14,120,76);x.fillRect(150,24,160,110);x.fillRect(325,14,62,76);
+ x.fillStyle='#fff4';for(let i=0;i<7;i++)x.fillRect(160,36+i*13,120-i*9,5);x.fillStyle='#000d';x.fillRect(0,154,400,16);x.fillStyle='#fff6';for(let i=0;i<8;i++)x.fillRect(10+i*22,159,14,6);stex.needsUpdate=true}
+function arc(R,w,h,th){const t=w/R,s=new THREE.Shape(),a0=PI/2-t/2,a1=PI/2+t/2;
+ s.absarc(0,0,R+th,a0,a1,false);s.absarc(0,0,R,a1,a0,true);
+ const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false,curveSegments:28});g.rotateX(-PI/2);g.translate(0,0,R);return g}
+function monitor(g){const R=1.5,H=.34,y0=.2;
+ const sh=new THREE.Mesh(arc(R,.84,H+.02,.035),mat('#111114'));sh.position.y=y0-.01;sh.userData.t=1;sh.castShadow=true;g.add(sh);
+ const sg=new THREE.CylinderGeometry(R-.004,R-.004,H-.02,40,1,true,PI-.8/R/2,.8/R);sg.scale(-1,1,1);sg.translate(0,0,R);
+ const sm=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({map:stex,side:THREE.DoubleSide,toneMapped:false}));sm.position.y=y0+H/2;g.add(sm);
+ B(g,.05,.22,.03,0,0,-.06,'#18181c');B(g,.34,.012,.2,0,0,-.05,'#18181c');B(g,.5,.008,.008,0,y0+.02,-.075,'acc');glow(g,0,y0+.2,.3,.5)}
+function pc(g){const W=.22,Hh=.48,D=.46;
+ B(g,.01,Hh,D,-.105,0,0,'#17171b');B(g,W,.01,D,0,Hh-.01,0,'#17171b');B(g,W,.01,D,0,0,0,'#17171b');B(g,W,Hh,.01,0,0,-.225,'#17171b');B(g,W,Hh,.012,0,0,.224,'#101014');
+ const gl=new THREE.Mesh(new THREE.BoxGeometry(.006,Hh,D),new THREE.MeshStandardMaterial({color:0x8fb4d6,transparent:true,opacity:.2,roughness:.05,depthWrite:false}));gl.position.set(.108,Hh/2,0);g.add(gl);
+ for(const y of[.1,.24,.38])fan(g,0,y,.236);
+ B(g,.008,.4,.3,-.085,.04,-.03,'#16241a',1);B(g,.07,.09,.09,-.05,.25,-.1,'#26262c',1);ring(g,-.012,.295,-.1,.035,PI/2);
+ B(g,.012,.1,.008,-.075,.27,-.02,'acc');B(g,.012,.1,.008,-.075,.27,-.035,'acc');
+ B(g,.055,.045,.3,-.04,.13,.04,'#202026',1);B(g,.05,.004,.28,-.04,.176,.04,'acc');fan(g,-.012,.152,.1,.02,PI/2);fan(g,-.012,.152,-.02,.02,PI/2);
+ B(g,.2,.07,.3,0,.012,-.07,'#0b0b0d',1);glow(g,0,.25,.05,.9)}
+const I={
+'Gaming desk':g=>{B(g,1.6,.04,.7,0,.73,0,'#1a1a1f');for(const x of[-.75,.75])for(const z of[-.3,.3])B(g,.04,.73,.04,x,0,z,'#111');B(g,1.5,.012,.02,0,.69,.33,'acc');glow(g,0,.6,.3,.8)},
+'Monitor (curved)':monitor,'Gaming PC':pc,
+'Keyboard':g=>{B(g,.44,.02,.14,0,0,0,'#141418');B(g,.42,.004,.004,0,.02,-.06,'acc')},
+'Gaming chair':g=>{B(g,.5,.08,.5,0,.45,0,'#c0172b');B(g,.5,.7,.1,0,.5,-.22,'#111');B(g,.06,.45,.06,0,0,0,'#222');B(g,.55,.05,.55,0,0,0,'#222');B(g,.5,.04,.12,0,1.15,-.22,'acc')},
+'Couch':g=>{B(g,2.1,.4,.9,0,0,0,'#2f3a4f');B(g,2.1,.5,.2,0,.4,-.35,'#2f3a4f');B(g,.2,.25,.7,-.95,.4,.1,'#273045');B(g,.2,.25,.7,.95,.4,.1,'#273045')},
+'Bean bag':g=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.45,24,16),mat('#d9531e',.9,0));m.userData.t=1;m.scale.y=.65;m.position.y=.3;m.castShadow=true;g.add(m)},
+'TV + stand':g=>{B(g,1.6,.45,.4,0,0,0,'#222');B(g,1.4,.8,.05,0,.45,0,'#050505',1);B(g,1.45,.85,.01,0,.45,-.04,'acc');glow(g,0,.8,-.2,1)},
+'Shelf':g=>{B(g,.04,1.8,.35,-.5,0,0,'#2a2a2a');B(g,.04,1.8,.35,.5,0,0,'#2a2a2a');for(let i=0;i<5;i++){B(g,1,.03,.35,0,.02+i*.44,0,'#2a2a2a');if(i<4)B(g,.18,.3,.2,-.25+i*.15,.05+i*.44,0,['#c0172b','#2b7bd9','#e0b020','#3a9a5a'][i],1)}},
+'Arcade cabinet':g=>{B(g,.65,1.8,.8,0,0,0,'#16161c');B(g,.5,.4,.02,0,1.15,.41,'#050a15',1);B(g,.65,.15,.02,0,1.6,.41,'acc');B(g,.6,.1,.4,0,.9,.4,'#222');glow(g,0,1.5,.6,.9)},
+'Pool table':g=>{B(g,1.4,.25,2.6,0,.62,0,'#3b2314');B(g,1.2,.02,2.4,0,.87,0,'#1f7a3a',1);for(const x of[-.6,.6])for(const z of[-1.15,1.15])B(g,.12,.62,.12,x,0,z,'#2a1a0e')},
+'Rug':g=>{B(g,2,.015,1.4,0,0,0,'#38384a')},
+'Coffee table':g=>{B(g,1,.04,.55,0,.4,0,'#d8d8d8');for(const x of[-.45,.45])for(const z of[-.22,.22])B(g,.04,.4,.04,x,0,z,'#222')},
+'Mini fridge':g=>{B(g,.5,.85,.5,0,0,0,'#2b2b30');B(g,.03,.3,.03,.2,.35,.26,'#aaa',1)},
+'Neon sign (wall)':g=>{B(g,1,.3,.02,0,1.5,0,'acc');glow(g,0,1.5,.2,1.6)},
+'RGB wall strip':g=>{B(g,2,.02,.02,0,2.1,0,'acc');glow(g,0,2.1,.2,1)},
+'Floor lamp':g=>{B(g,.25,.02,.25,0,0,0,'#222');B(g,.03,1.5,.03,0,0,0,'#222');B(g,.22,.3,.22,0,1.5,0,'acc');glow(g,0,1.6,0,1.3)}};
+// ---------- items ----------
+const items=[];let sel=null;
+const box=new THREE.BoxHelper(new THREE.Object3D(),0xffd400);box.visible=false;sc.add(box);
+const hex=c=>'#'+c.getHexString();
+function tint(g,c){g.userData.col=c;g.traverse(m=>{if(m.userData.t)m.material.color.set(c)})}
+function add(type,x=1.7+Math.random()*.6-.3,z=-6+Math.random()*1.2-.6,rot=0,o={}){
+ const g=new THREE.Group();g.userData={type,am:[],al:[],sp:[],elev:o.e||0};cur=g.userData;I[type](g);
+ g.position.set(x,FY+(o.e||0),z);g.rotation.y=rot;if(o.s)g.scale.set(...o.s);if(o.c)tint(g,o.c);if(o.a)g.userData.own=new THREE.Color(o.a);
+ sc.add(g);items.push(g);pick(g);applyLight();return g}
+function pick(g){sel=g;box.visible=!!g;if(!g)return;
+ $('sw').value=g.scale.x;$('sh').value=g.scale.y;$('sd').value=g.scale.z;$('se').value=g.userData.elev;
+ let t='#888888';g.traverse(m=>{if(m.userData.t&&t==='#888888')t=hex(m.material.color)});$('ic').value=t;$('ia').value=hex(g.userData.own||accent)}
+const lp=$('L');for(const t in I){const b=document.createElement('button');b.textContent=t;b.onclick=()=>add(t);lp.appendChild(b)}
+$('setup').onclick=()=>{const x=1.7,z=-8.9;add('Gaming desk',x,z);add('Monitor (curved)',x-.28,z-.1,0,{e:.77});add('Gaming PC',x+.62,z-.05,0,{e:.77});add('Keyboard',x-.28,z+.15,0,{e:.77});add('Gaming chair',x,z+.9,PI)};
+function clampItem(g){g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
+ g.position.x+=Math.max(0,XMIN-b.min.x)-Math.max(0,b.max.x-XMAX);g.position.z+=Math.max(0,ZMIN-b.min.z)-Math.max(0,b.max.z-ZMAX)}
+// ---------- interaction ----------
+const ray=new THREE.Raycaster(),pl=new THREE.Plane(new THREE.Vector3(0,1,0),-FY),pt=new THREE.Vector3(),off=new THREE.Vector3();let drag=null;
+function ndc(e){const r=cv.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),cam)}
+cv.addEventListener('pointerdown',e=>{ndc(e);const h=ray.intersectObjects(items,true)[0];
+ if(h){let o=h.object;while(!items.includes(o))o=o.parent;pick(o);drag=o;ray.ray.intersectPlane(pl,pt);off.copy(o.position).sub(pt);off.y=0;oc.enabled=false;cv.setPointerCapture(e.pointerId)}else pick(null)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;ndc(e);if(ray.ray.intersectPlane(pl,pt)){drag.position.x=pt.x+off.x;drag.position.z=pt.z+off.z;clampItem(drag)}});
+addEventListener('pointerup',()=>{drag=null;oc.enabled=true});
+const rot=a=>{if(sel){sel.rotation.y+=a;clampItem(sel)}},del=()=>{if(sel){sc.remove(sel);items.splice(items.indexOf(sel),1);pick(null)}};
+$('r15').onclick=()=>rot(PI/12);$('r90').onclick=()=>rot(PI/2);$('del').onclick=del;
+$('dup').onclick=()=>{if(!sel)return;const u=sel.userData,g=add(u.type,sel.position.x+.3,sel.position.z+.3,sel.rotation.y,{e:u.elev,s:sel.scale.toArray(),c:u.col,a:u.own&&hex(u.own)});clampItem(g)};
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='r'||e.key==='R')rot(PI/2);if(e.key==='Delete'||e.key==='Backspace')del()});
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));
+['sw','sh','sd'].forEach(id=>$(id).oninput=()=>{if(sel){sel.scale.set(+$('sw').value,+$('sh').value,+$('sd').value);clampItem(sel)}});
+$('se').oninput=()=>{if(sel){sel.userData.elev=+$('se').value;sel.position.y=FY+sel.userData.elev}};
+$('ic').oninput=e=>{if(sel)tint(sel,e.target.value)};
+$('ia').oninput=e=>{if(sel){sel.userData.own=new THREE.Color(e.target.value);applyLight()}};
+$('ar').onclick=()=>{if(sel){delete sel.userData.own;applyLight();$('ia').value=hex(accent)}};
+// ---------- lighting ----------
+function applyLight(){const n=+$('night').value;
+ sc.background=new THREE.Color('#9cc8ee').lerp(new THREE.Color('#05060b'),n);
+ hemi.intensity=1.1*(1-n)+.12*n;sun.intensity=2.4*(1-n)+.05*n;ceilL.intensity=n*18;
+ items.forEach(g=>{const c=g.userData.own||accent;g.userData.am.forEach(m=>{m.emissive.copy(c);m.emissiveIntensity=1.2+n*1.5});g.userData.al.forEach(l=>{l.color.copy(c);l.intensity=(.5+n*5)*l.userData.k})})}
+$('night').oninput=applyLight;$('acc').oninput=e=>{accent=new THREE.Color(e.target.value);drawScreen();applyLight()};
+// ---------- save / load ----------
+const K='studio-layout-v2',wipe=()=>{items.slice().forEach(g=>sc.remove(g));items.length=0;pick(null)};
+$('save').onclick=()=>localStorage.setItem(K,JSON.stringify(items.map(g=>{const u=g.userData;return[u.type,g.position.x,g.position.z,g.rotation.y,{e:u.elev,s:g.scale.toArray(),c:u.col,a:u.own&&hex(u.own)}]})));
+$('load').onclick=()=>{const s=localStorage.getItem(K);if(!s)return;wipe();JSON.parse(s).forEach(a=>add(...a));pick(null)};
+$('clr').onclick=wipe;
+// ---------- loop ----------
+function rs(){rd.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+addEventListener('resize',rs);rs();drawScreen();applyLight();
+const clk=new THREE.Clock();
+rd.setAnimationLoop(()=>{const dt=clk.getDelta(),t=clk.elapsedTime;
+ if($('mode').value==='r'){accent.setHSL((t*.1)%1,1,.5);applyLight()}
+ const sp=dt*28*+$('fs').value;items.forEach(g=>g.userData.sp.forEach(s=>s.rotation.z-=sp));
+ oc.update();if(sel)box.setFromObject(sel);rd.render(sc,cam)});
+</script></body></html>
