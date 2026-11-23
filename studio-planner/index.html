@@ -15,23 +15,23 @@ label{display:block;margin:5px 0;font-size:13px}select{width:100%;background:#2b
 @media(max-width:700px){#L{width:120px}#R{width:150px}}
 </style></head><body>
 <canvas id="c"></canvas><div id="msg">Loading studio…</div>
-<div id="hud"><div class="t">WASD / arrows: walk · drag: look · Shift: run · Esc: exit</div><button class="x" id="exitw">✕ Exit walk mode</button><div id="pad"><span></span><button data-k="w">▲</button><span></span><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div></div>
+<div id="hud"><div class="t">WASD / arrows: walk · drag: look · Shift: run · E: open/close door · Esc: exit</div><button class="x" id="exitw">✕ Exit walk mode</button><div id="pad"><span></span><button data-k="w">▲</button><span></span><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div></div>
 <div class="p" id="L"><h4>Quick start</h4><button id="walk">🚶 Walk around</button><button id="setup">★ Gaming setup</button><h4>Add item</h4></div>
 <div class="p" id="R">
 <h4>View</h4><button data-v="top">Top</button><button data-v="deck">Deck</button><button data-v="in">Inside</button>
-<label><input type="checkbox" id="roof"> Show roof &amp; ceiling</label>
+<button id="roofb" style="width:100%;font-weight:600;padding:9px">🏠 Roof: OFF</button><input type="checkbox" id="roof" hidden>
 <h4>Room lighting</h4>
 <label>Day ↔ Night<input type="range" id="night" min="0" max="1" step="0.01" value="0.2"></label>
-<label>Global RGB colour<input type="color" id="acc" value="#8a2be2"></label>
+<label>Interior wall colour<input type="color" id="wallc" value="#ccced6"></label><label>Exterior colour<input type="color" id="cladc" value="#a1adc2"></label><label>Global RGB colour<input type="color" id="acc" value="#8a2be2"></label>
 <label>RGB mode<select id="mode"><option value="s">Static</option><option value="r">Rainbow cycle</option></select></label>
 <label><input type="checkbox" id="hq" checked> High-quality glow (bloom)</label><label>Fan speed<input type="range" id="fs" min="0" max="2" step="0.05" value="1"></label>
 <h4>Selected item</h4>
 <label>Body colour<input type="color" id="ic" value="#222222"></label>
 <label>This item's RGB<input type="color" id="ia" value="#8a2be2"></label><button id="ar">Use global RGB</button>
-<label>Width<input type="range" id="sw" min="0.3" max="2.5" step="0.05" value="1"></label>
-<label>Height<input type="range" id="sh" min="0.3" max="2.5" step="0.05" value="1"></label>
-<label>Depth<input type="range" id="sd" min="0.3" max="2.5" step="0.05" value="1"></label>
-<label>Lift off floor<input type="range" id="se" min="0" max="2" step="0.01" value="0"></label>
+<label>Width<input type="range" id="sw" min="0.3" max="4" step="0.05" value="1"></label>
+<label>Height<input type="range" id="sh" min="0.3" max="4" step="0.05" value="1"></label>
+<label>Depth<input type="range" id="sd" min="0.3" max="4" step="0.05" value="1"></label>
+<label>Real size in cm (W · H · D)<input type="number" id="nw" style="width:32%"> <input type="number" id="nh" style="width:32%"> <input type="number" id="nd" style="width:32%"></label><label>Lift off floor<input type="range" id="se" min="0" max="2" step="0.01" value="0"></label>
 <button id="r15">⟳ 15°</button><button id="r90">⟳ 90°</button><button id="dup">Copy</button><button id="del">Delete</button>
 <p style="color:#9aa;font-size:12px;margin:6px 0">Drag to move. R = rotate, Del = remove. Lift a monitor to 0.77 to sit it on a desk.</p>
 <h4>Save &amp; load</h4><button id="exp">⬇ Save to file</button><button id="imp">⬆ Load from file</button><input type="file" id="file" accept=".json,application/json" hidden><br><button id="save">Quick save</button><button id="load">Quick load</button><button id="clr">Clear all</button>
@@ -65,26 +65,28 @@ sc.add(hemi,sun,ceilL,sun.target);sun.target.position.set(1.7,0,-5);
 function view(v){const P={top:[[1.7,14,-3.8],[1.7,0,-5.6]],deck:[[-6.5,2.6,-8.5],[1.7,1,-6.5]],in:[[1.7,1.8,-3],[1.7,0.9,-9]]}[v];cam.position.set(...P[0]);oc.target.set(...P[1])}
 view('top');
 let roofNodes=[];
-const MR={roof:[.45,.7],roof_rib:[.4,.75],roof_cap:[.4,.8],stone1:[.12,0],stone2:[.12,0],grout:[.9,0],wood1:[.42,0],wood2:[.42,0],wood3:[.42,0],cladding:[.85,0],trim:[.5,0],grass1:[1,0],grass2:[1,0],fascia:[.5,.5]};
+const MM={};const MR={roof:[.45,.7],roof_rib:[.4,.75],roof_cap:[.4,.8],stone1:[.12,0],stone2:[.12,0],grout:[.9,0],wood1:[.42,0],wood2:[.42,0],wood3:[.42,0],cladding:[.85,0],trim:[.5,0],grass1:[1,0],grass2:[1,0],fascia:[.5,.5]};
 function upgrade(o){const ms=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{const n=(m.name||'').replace(/^m_/,'');let p;
  if(n==='glass')p=new THREE.MeshPhysicalMaterial({color:0xcfe6f5,roughness:.02,transparent:true,opacity:.28,envMapIntensity:1.6});
  else{const r=MR[n]||[.8,0];p=(n.startsWith('stone')||n.startsWith('wood'))?new THREE.MeshPhysicalMaterial({color:m.color,roughness:r[0],clearcoat:n[0]==='s'?1:.35,clearcoatRoughness:.12}):new THREE.MeshStandardMaterial({color:m.color,roughness:r[0],metalness:r[1]})}
- p.name=n;return p});o.material=ms.length>1?ms:ms[0]}
+ p.name=n;return MM[n]||(MM[n]=p)});o.material=ms.length>1?ms:ms[0]}
 (function tufts(){const N=18000,g=new THREE.ConeGeometry(.012,.14,3);g.translate(0,.07,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({roughness:1}),N),d=new THREE.Object3D(),c=new THREE.Color();let i=0;
  while(i<N){const x=-8+Math.random()*19,z=-18+Math.random()*27;if(x>-2.2&&x<4.2&&z>-10.4&&z<.8)continue;
   d.position.set(x,0,z);d.rotation.set((Math.random()-.5)*.4,Math.random()*6,(Math.random()-.5)*.4);d.scale.setScalar(.7+Math.random()*.9);d.updateMatrix();im.setMatrixAt(i,d.matrix);
   im.setColorAt(i++,c.setHSL(.24+Math.random()*.06,.55,.18+Math.random()*.14))}
  im.castShadow=false;sc.add(im)})();
-new ColladaLoader().load('./Studio_Model.dae',c=>{c.scene.traverse(o=>{if(o.isMesh){upgrade(o);o.castShadow=o.receiveShadow=true}if(['Roof','Ceiling'].includes(o.name))roofNodes.push(o)});
+new ColladaLoader().load('./Studio_Model.dae',c=>{c.scene.traverse(o=>{if(o.isMesh){upgrade(o);o.castShadow=o.receiveShadow=true}if(['Roof','Gables','RoofBeams'].includes(o.name))roofNodes.push(o)});
  sc.add(c.scene);$('msg').remove();setRoof()},undefined,()=>{$('msg').textContent='Could not load model (use a web server, not file://)'});
-const setRoof=()=>roofNodes.forEach(o=>o.visible=$('roof').checked);$('roof').onchange=setRoof;
+const setRoof=()=>{roofNodes.forEach(o=>o.visible=$('roof').checked);$('roofb').textContent='🏠 Roof: '+($('roof').checked?'ON':'OFF')};$('roofb').onclick=()=>{$('roof').checked=!$('roof').checked;setRoof()};
 // ---------- helpers ----------
 let accent=new THREE.Color('#8a2be2'),cur=null;
 function mkTex(draw){const c=document.createElement('canvas');c.width=c.height=256;draw(c.getContext('2d'));const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t}
 const fabTex=mkTex(x=>{x.fillStyle='#808080';x.fillRect(0,0,256,256);for(let i=0;i<14000;i++){const v=Math.random()*255|0;x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(Math.random()*256,Math.random()*256,2,2)}});
 const woodTex=mkTex(x=>{x.fillStyle='#8b5a33';x.fillRect(0,0,256,256);for(let i=0;i<160;i++){const y=Math.random()*256;x.strokeStyle=`rgba(${40+Math.random()*50|0},${20+Math.random()*30|0},10,${.07+Math.random()*.13})`;x.lineWidth=.5+Math.random()*2.5;x.beginPath();x.moveTo(0,y);for(let p=0;p<=256;p+=32)x.lineTo(p,y+Math.sin(p*.05+i)*2);x.stroke()}});
 function mk(c){if(c==='wood')return new THREE.MeshStandardMaterial({map:woodTex,roughness:.5});
- if(c[1]===':'){const k=c[0],h=c.slice(2);if(k==='m')return new THREE.MeshStandardMaterial({color:h,roughness:.3,metalness:.9});
+ if(c[1]===':'){const k=c[0],h=c.slice(2);if(k==='p')return new THREE.MeshStandardMaterial({color:h,roughness:.15,metalness:0});
+  if(k==='g')return new THREE.MeshPhysicalMaterial({color:0xcfe6f5,roughness:.03,transparent:true,opacity:.25,depthWrite:false});
+  if(k==='m')return new THREE.MeshStandardMaterial({color:h,roughness:.3,metalness:.9});
   if(k==='f')return new THREE.MeshStandardMaterial({color:h,roughness:1,bumpMap:fabTex,bumpScale:1.5})}
  return new THREE.MeshStandardMaterial({color:c,roughness:.5,metalness:.15})}
 const mat=mk;
@@ -93,7 +95,7 @@ function B(g,w,h,d,x,y,z,c,n){const a=c==='acc',f=c[1]===':'&&c[0]==='f',rr=Math
  m=new THREE.Mesh(new RoundedBoxGeometry(w,h,d,f?5:3,rr),a?am():mk(c));
  m.position.set(x,y+h/2,z);m.castShadow=m.receiveShadow=true;if(!a&&!n)m.userData.t=1;g.add(m);return m}
 function Cy(g,r,h,x,y,z,c){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,18),mk(c||'m:#222'));m.position.set(x,y+h/2,z);m.castShadow=true;g.add(m);return m}
-function glow(g,x,y,z,k=1){const l=new THREE.PointLight(0xffffff,0,5,2);l.userData.k=k;l.position.set(x,y,z);g.add(l);cur.al.push(l)}
+function glow(g,x,y,z,k=1,w){const l=new THREE.PointLight(0xffffff,0,5,2);l.userData.k=k;l.userData.w=w;l.position.set(x,y,z);g.add(l);cur.al.push(l)}
 function fan(g,x,y,z,r=.055,ry=0){const p=new THREE.Group();p.position.set(x,y,z);p.rotation.y=ry;g.add(p);
  p.add(new THREE.Mesh(new THREE.BoxGeometry(r*2.1,r*2.1,.02),mat('#0b0b0e')));
  const ring=new THREE.Mesh(new THREE.TorusGeometry(r*.93,.005,8,28),am());ring.position.z=.011;p.add(ring);
@@ -150,29 +152,62 @@ const box=new THREE.BoxHelper(new THREE.Object3D(),0xffd400);box.visible=false;s
 const hex=c=>'#'+c.getHexString();
 function tint(g,c){g.userData.col=c;g.traverse(m=>{if(m.userData.t)m.material.color.set(c)})}
 function add(type,x=1.7+Math.random()*.6-.3,z=-6+Math.random()*1.2-.6,rot=0,o={}){
- const g=new THREE.Group();g.userData={type,am:[],al:[],sp:[],elev:o.e||0};cur=g.userData;I[type](g);
- g.position.set(x,FY+(o.e||0),z);g.rotation.y=rot;if(o.s)g.scale.set(...o.s);if(o.c)tint(g,o.c);if(o.a)g.userData.own=new THREE.Color(o.a);
+ const g=new THREE.Group();const e0=o.e!=null?o.e:(DE[type]||0);g.userData={type,am:[],al:[],sp:[],elev:e0};cur=g.userData;I[type](g);g.userData.base=new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+ g.position.set(x,FY+e0,z);g.rotation.y=rot;if(o.s)g.scale.set(...o.s);if(o.c)tint(g,o.c);if(o.a)g.userData.own=new THREE.Color(o.a);
  sc.add(g);items.push(g);pick(g);applyLight();return g}
-function pick(g){sel=g;box.visible=!!g;if(!g)return;
+function syncDims(g){const b=g.userData.base;['nw','nh','nd'].forEach((id,i)=>$(id).value=Math.round(b.toArray()[i]*g.scale.toArray()[i]*100))}
+function pick(g){sel=g;box.visible=!!g;if(!g)return;syncDims(g);
  $('sw').value=g.scale.x;$('sh').value=g.scale.y;$('sd').value=g.scale.z;$('se').value=g.userData.elev;
  let t='#888888';g.traverse(m=>{if(m.userData.t&&t==='#888888')t=hex(m.material.color)});$('ic').value=t;$('ia').value=hex(g.userData.own||accent)}
-const lp=$('L');for(const t in I){const b=document.createElement('button');b.textContent=t;b.onclick=()=>add(t);lp.appendChild(b)}
+
 $('setup').onclick=()=>{const x=1.7,z=-8.9;add('Gaming desk',x,z);add('Monitor (curved)',x-.28,z-.1,0,{e:.77});add('Gaming PC',x+.62,z-.05,0,{e:.77});add('Keyboard',x-.28,z+.15,0,{e:.77});add('Gaming chair',x,z+.9,PI)};
 function clampItem(g){g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
  g.position.x+=Math.max(0,XMIN-b.min.x)-Math.max(0,b.max.x-XMAX);g.position.z+=Math.max(0,ZMIN-b.min.z)-Math.max(0,b.max.z-ZMAX)}
+const DE={'Wall TV 65"':.9,'Soundbar':.0};
+function star(g){Cy(g,.025,.3,0,.15,0);for(let i=0;i<5;i++){const a=i/5*PI*2,b=B(g,.05,.03,.3,Math.sin(a)*.15,.1,Math.cos(a)*.15,'m:#222');b.rotation.y=a;Cy(g,.03,.05,Math.sin(a)*.3,.02,Math.cos(a)*.3,'#111')}}
+Object.assign(I,{
+'Oak TV unit':g=>{B(g,1.9,.38,.4,0,0,0,'wood');B(g,.01,.3,.005,-.3,.04,.2,'#222',1);B(g,.01,.3,.005,.3,.04,.2,'#222',1)},
+'Wall TV 65"':g=>{B(g,1.45,.83,.04,0,0,0,'m:#050505',1)},
+'Soundbar':g=>{B(g,.9,.06,.1,0,0,0,'#111',1)},
+'Cube shelf':g=>{const w='#f2f2f0';B(g,.03,1.15,.4,-.56,0,0,w);B(g,.03,1.15,.4,.56,0,0,w);B(g,.03,1.15,.4,0,0,0,w);B(g,1.15,.03,.4,0,0,0,w);B(g,1.15,.03,.4,0,.56,0,w);B(g,1.15,.03,.4,0,1.12,0,w);B(g,.3,.28,.3,-.28,.03,.03,'f:#2b2b2e',1);B(g,.3,.28,.3,.28,.03,.03,'f:#2b2b2e',1)},
+'Office chair':g=>{B(g,.46,.07,.46,0,.45,0,'f:#4a5a6a');B(g,.4,.36,.05,0,.6,-.24,'f:#4a5a6a').rotation.x=-.1;star(g)},
+'Sim racing rig':g=>{const k='m:#2a2a2e';for(const x of[-.28,.28])B(g,.05,.05,1.5,x,.12,0,k);B(g,.6,.05,.05,0,.12,.7,k);B(g,.6,.05,.05,0,.12,-.7,k);for(const x of[-.28,.28])B(g,.05,.45,.05,x,.17,.45,k);B(g,.6,.04,.4,0,.6,.5,k);
+ B(g,.5,.12,.5,0,.3,-.2,'f:#16161a');B(g,.5,.62,.12,0,.35,-.48,'f:#16161a').rotation.x=-.15;B(g,.04,.5,.01,-.12,.4,-.4,'#c0172b',1);B(g,.04,.5,.01,.12,.4,-.4,'#c0172b',1);
+ const t=new THREE.Mesh(new THREE.TorusGeometry(.14,.018,12,28),mk('#111'));t.position.set(0,.85,.5);t.rotation.x=-.4;t.castShadow=true;g.add(t);B(g,.1,.1,.04,0,.8,.5,'acc');B(g,.4,.03,.25,0,.14,.9,k)},
+'Electronic drums':g=>{const k='m:#1b1b1b';Cy(g,.012,1.15,-.4,0,-.05,k);Cy(g,.17,.012,-.4,1.15,-.05,k);Cy(g,.012,.95,.4,0,-.05,k);Cy(g,.17,.012,.4,.95,-.05,k);Cy(g,.012,.62,0,0,.12,k);Cy(g,.18,.04,0,.62,.12,'#1b1b1b');Cy(g,.1,.04,-.15,.82,-.12,'#1b1b1b');Cy(g,.1,.04,.15,.82,-.12,'#1b1b1b');B(g,.35,.35,.22,0,.15,.55,'#1b1b1b')},
+'Tripod floor lamp':g=>{for(let i=0;i<3;i++){const a=i*2.094,l=Cy(g,.012,1.0,0,0,0,'wood');l.position.set(Math.sin(a)*.12,.5,Math.cos(a)*.12);l.rotation.set(Math.cos(a)*.22,0,Math.sin(a)*.22)}{const m=Cy(g,.2,.35,0,1.05,0,'#f4efe6').material;m.emissive=new THREE.Color(0xffe2b0);m.emissiveIntensity=.25}glow(g,0,1.2,0,1.4,true)}});
+const lp=$('L');for(const t in I){const b=document.createElement('button');b.textContent=t;b.onclick=()=>add(t);lp.appendChild(b)}
+// ---------- interior doors + bathroom ----------
+const doors=[],WARM=new THREE.Color(0xffd9a0),bathBoxes=[{min:{x:2.65,z:-2.65},max:{x:3.05,z:-2.2}},{min:{x:3.0,z:-1.6},max:{x:3.4,z:-.85}},{min:{x:2.3,z:-.95},max:{x:3.4,z:0}}];
+function door(x,z0,t){const p=new THREE.Group(),g=new THREE.Group();p.position.set(x,FY,z0);g.position.z=.4;p.add(g);p.userData={dr:1,t:0,open:t};
+ B(g,.04,2.04,.8,0,0,0,'p:#f3f3f1',1);for(const sx of[-.024,.024])for(const zz of[-.19,.19])for(const[y,h]of[[1.2,.65],[.15,.85]])B(g,.012,h,.26,sx,y,zz,'p:#f3f3f1',1);
+ B(g,.07,.04,.04,0,1.0,.33,'m:#aaa',1);sc.add(p);doors.push(p)}
+door(1.15,-1.6,-PI/2);door(2.25,-1.55,PI/2);
+const toggleDoor=p=>p.userData.t=p.userData.t?0:p.userData.open;
+function nearDoor(){let b=null,bd=2.2;doors.forEach(d=>{const w=new THREE.Vector3();d.children[0].getWorldPosition(w);const k=Math.hypot(w.x-cam.position.x,w.z-cam.position.z);if(k<bd){bd=k;b=d}});if(b)toggleDoor(b)}
+(function bath(){const g=new THREE.Group(),t=new THREE.Group(),P='p:#f6f6f4';sc.add(g);t.position.set(2.85,FY,-2.4);g.add(t);
+ B(t,.38,.45,.16,0,.4,-.2,P,1);B(t,.08,.02,.02,0,.86,-.12,'m:#ccc',1);
+ const cer=()=>mk(P),bowl=new THREE.Mesh(new THREE.CylinderGeometry(.19,.13,.4,28),cer());bowl.scale.z=1.4;bowl.position.set(0,.2,.1);t.add(bowl);
+ const seat=new THREE.Mesh(new THREE.TorusGeometry(.17,.022,10,28),cer());seat.rotation.x=PI/2;seat.scale.y=1.4;seat.position.set(0,.41,.1);t.add(seat);
+ const lid=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.015,28),cer());lid.scale.z=1.4;lid.position.set(0,.425,.1);t.add(lid);
+ const v=new THREE.Group();v.position.set(3.15,FY,-1.25);v.rotation.y=-PI/2;g.add(v);
+ B(v,.6,.8,.45,0,0,0,'wood',1);B(v,.62,.03,.47,0,.8,0,P,1);Cy(v,.012,.14,0,.83,-.15,'m:#ccc');B(v,.02,.02,.1,0,.95,-.1,'m:#ccc',1);
+ B(g,1.0,.04,.85,2.85,FY,-.45,P,1);B(g,1.0,1.9,.012,2.85,FY+.04,-.9,'g:#ffffff',1);B(g,.012,1.9,.85,2.35,FY+.04,-.45,'g:#ffffff',1);Cy(g,.09,.015,3.15,FY+2.0,-.45,'m:#ccc');B(g,.3,.02,.02,3.28,FY+2.0,-.45,'m:#ccc',1);
+ g.traverse(m=>{if(m.isMesh)m.receiveShadow=true})})();
 // ---------- interaction ----------
 const ray=new THREE.Raycaster(),pl=new THREE.Plane(new THREE.Vector3(0,1,0),-FY),pt=new THREE.Vector3(),off=new THREE.Vector3();let drag=null;
 function ndc(e){const r=cv.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),cam)}
 cv.addEventListener('pointerdown',e=>{if(walking)return;ndc(e);const h=ray.intersectObjects(items,true)[0];
- if(h){let o=h.object;while(!items.includes(o))o=o.parent;pick(o);drag=o;ray.ray.intersectPlane(pl,pt);off.copy(o.position).sub(pt);off.y=0;oc.enabled=false;cv.setPointerCapture(e.pointerId)}else pick(null)});
+ if(h){let o=h.object;while(!items.includes(o))o=o.parent;pick(o);drag=o;ray.ray.intersectPlane(pl,pt);off.copy(o.position).sub(pt);off.y=0;oc.enabled=false;cv.setPointerCapture(e.pointerId)}else{const d=ray.intersectObjects(doors,true)[0];if(d){let o=d.object;while(!o.userData.dr)o=o.parent;toggleDoor(o)}pick(null)}});
 cv.addEventListener('pointermove',e=>{if(!drag)return;ndc(e);if(ray.ray.intersectPlane(pl,pt)){drag.position.x=pt.x+off.x;drag.position.z=pt.z+off.z;clampItem(drag)}});
 addEventListener('pointerup',()=>{drag=null;oc.enabled=true});
 const rot=a=>{if(sel){sel.rotation.y+=a;clampItem(sel)}},del=()=>{if(sel){sc.remove(sel);items.splice(items.indexOf(sel),1);pick(null)}};
 $('r15').onclick=()=>rot(PI/12);$('r90').onclick=()=>rot(PI/2);$('del').onclick=del;
 $('dup').onclick=()=>{if(!sel)return;const u=sel.userData,g=add(u.type,sel.position.x+.3,sel.position.z+.3,sel.rotation.y,{e:u.elev,s:sel.scale.toArray(),c:u.col,a:u.own&&hex(u.own)});clampItem(g)};
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='r'||e.key==='R')rot(PI/2);if(e.key==='Delete'||e.key==='Backspace')del()});
-document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));
-['sw','sh','sd'].forEach(id=>$(id).oninput=()=>{if(sel){sel.scale.set(+$('sw').value,+$('sh').value,+$('sd').value);clampItem(sel)}});
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{view(b.dataset.v);if(b.dataset.v==='top'){$('roof').checked=false;setRoof()}});
+['sw','sh','sd'].forEach(id=>$(id).oninput=()=>{if(sel){sel.scale.set(+$('sw').value,+$('sh').value,+$('sd').value);clampItem(sel);syncDims(sel)}});
+['nw','nh','nd'].forEach((id,i)=>$(id).onchange=()=>{if(!sel)return;const k='xyz'[i],b=sel.userData.base.toArray()[i]||.01;sel.scale[k]=Math.max(5,+$(id).value)/100/b;clampItem(sel);pick(sel)});
 $('se').oninput=()=>{if(sel){sel.userData.elev=+$('se').value;sel.position.y=FY+sel.userData.elev}};
 $('ic').oninput=e=>{if(sel)tint(sel,e.target.value)};
 $('ia').oninput=e=>{if(sel){sel.userData.own=new THREE.Color(e.target.value);applyLight()}};
@@ -180,9 +215,9 @@ $('ar').onclick=()=>{if(sel){delete sel.userData.own;applyLight();$('ia').value=
 // ---------- lighting ----------
 function applyLight(){const n=+$('night').value;
  sc.background=new THREE.Color('#9cc8ee').lerp(new THREE.Color('#05060b'),n);
- hemi.intensity=.7*(1-n)+.1*n;sc.environmentIntensity=.55*(1-n)+.12*n;bloom.strength=.12+n*.75;sc.fog.color.copy(sc.background);sun.intensity=2.4*(1-n)+.05*n;ceilL.intensity=n*18;
- items.forEach(g=>{const c=g.userData.own||accent;g.userData.am.forEach(m=>{m.emissive.copy(c);m.emissiveIntensity=1.2+n*1.5});g.userData.al.forEach(l=>{l.color.copy(c);l.intensity=(.5+n*5)*l.userData.k})})}
-$('night').oninput=applyLight;$('acc').oninput=e=>{accent=new THREE.Color(e.target.value);drawScreen();applyLight()};
+ hemi.intensity=.7*(1-n)+.1*n;sc.environmentIntensity=.55*(1-n)+.12*n;bloom.strength=.04+n*.8;sc.fog.color.copy(sc.background);sun.intensity=2.4*(1-n)+.05*n;ceilL.intensity=n*18;
+ items.forEach(g=>{const c=g.userData.own||accent;g.userData.am.forEach(m=>{m.emissive.copy(c);m.emissiveIntensity=1.2+n*1.5});g.userData.al.forEach(l=>{l.color.copy(l.userData.w?WARM:c);l.intensity=(.5+n*5)*l.userData.k})})}
+$('wallc').oninput=e=>MM.wall_in&&MM.wall_in.color.set(e.target.value);$('cladc').oninput=e=>MM.cladding&&MM.cladding.color.set(e.target.value);$('night').oninput=applyLight;$('acc').oninput=e=>{accent=new THREE.Color(e.target.value);drawScreen();applyLight()};
 // ---------- save / load ----------
 const K='studio-layout-v2',wipe=()=>{items.slice().forEach(g=>sc.remove(g));items.length=0;pick(null)};
 const ser=()=>JSON.stringify({app:'studio-planner',v:2,acc:hex(accent),night:+$('night').value,mode:$('mode').value,fan:+$('fs').value,
@@ -214,13 +249,13 @@ function groundH(x,z){if(x>-.2&&x<3.6&&z>-9.9&&z<.3)return FY;
 function enterWalk(){saved={p:cam.position.clone(),t:oc.target.clone(),roof:$('roof').checked};
  walking=true;oc.enabled=false;box.visible=false;$('roof').checked=true;setRoof();
  document.querySelectorAll('.p').forEach(e=>e.style.display='none');$('hud').style.display='block';
- boxes=items.filter(g=>g.userData.elev<.9&&g.userData.type!=='Rug').map(g=>new THREE.Box3().setFromObject(g));
+ boxes=items.filter(g=>g.userData.elev<.9&&g.userData.type!=='Rug').map(g=>new THREE.Box3().setFromObject(g)).concat(bathBoxes);
  cam.rotation.order='YXZ';cam.position.set(-4,1.65,-8.5);yaw=-PI/2;pitch=0;gy=0;cam.fov=70;cam.updateProjectionMatrix();ceilL.position.set(1.7,2.9,-5.5)}
 function exitWalk(){if(!walking)return;walking=false;oc.enabled=true;cam.fov=50;cam.updateProjectionMatrix();cam.rotation.order='XYZ';
  cam.position.copy(saved.p);oc.target.copy(saved.t);$('roof').checked=saved.roof;setRoof();
  document.querySelectorAll('.p').forEach(e=>e.style.display='');$('hud').style.display='none';if(sel)box.visible=true;applyLight()}
 $('walk').onclick=enterWalk;$('exitw').onclick=exitWalk;
-addEventListener('keydown',e=>{if(!walking)return;const k=e.key.toLowerCase();if(k==='escape')return exitWalk();
+addEventListener('keydown',e=>{if(!walking)return;const k=e.key.toLowerCase();if(k==='escape')return exitWalk();if(k==='e')nearDoor();
  keys[{arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'}[k]||k]=1;if(e.key.startsWith('Arrow'))e.preventDefault()});
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys[{arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'}[k]||k]=0});
 document.querySelectorAll('#pad [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
@@ -238,6 +273,6 @@ addEventListener('resize',rs);rs();drawScreen();applyLight();
 const clk=new THREE.Clock();
 rd.setAnimationLoop(()=>{const dt=clk.getDelta(),t=clk.elapsedTime;
  if($('mode').value==='r'){accent.setHSL((t*.1)%1,1,.5);applyLight()}else if(walking)applyLight();
- const sp=dt*28*+$('fs').value;items.forEach(g=>g.userData.sp.forEach(s=>s.rotation.z-=sp));
+ doors.forEach(d=>d.rotation.y+=(d.userData.t-d.rotation.y)*Math.min(1,dt*6));const sp=dt*28*+$('fs').value;items.forEach(g=>g.userData.sp.forEach(s=>s.rotation.z-=sp));
  if(walking){stepWalk(dt);ceilL.intensity=Math.max(ceilL.intensity,9)}else{oc.update();if(sel)box.setFromObject(sel)}$('hq').checked?comp.render():rd.render(sc,cam)});
 </script></body></html>
