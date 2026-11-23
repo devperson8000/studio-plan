@@ -50,18 +50,18 @@ import {OutputPass} from './vendor/postprocessing/OutputPass.js';
 const FY=0.55,XMIN=0.05,XMAX=3.35,ZMIN=-9.55,ZMAX=-2.85,PI=Math.PI;
 const cv=document.getElementById('c'),$=id=>document.getElementById(id);
 const rd=new THREE.WebGLRenderer({canvas:cv,antialias:true});rd.setPixelRatio(Math.min(devicePixelRatio,2));
-rd.shadowMap.enabled=true;rd.shadowMap.type=THREE.PCFShadowMap;rd.toneMapping=THREE.ACESFilmicToneMapping;rd.toneMappingExposure=.85;
+rd.shadowMap.enabled=true;rd.shadowMap.type=THREE.PCFSoftShadowMap;rd.toneMapping=THREE.ACESFilmicToneMapping;rd.toneMappingExposure=.85;
 const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,200);
 const oc=new OrbitControls(cam,cv);oc.enableDamping=true;oc.maxPolarAngle=PI*0.499;
 let ins=0,fairyM=null;const hemi=new THREE.HemisphereLight(0xeaf2ff,0x6a6a58,.5),sun=new THREE.DirectionalLight(0xfff0db,2.8);
 sun.position.set(-8,14,4);sun.castShadow=true;{const SM=Math.min(4096,rd.capabilities.maxTextureSize);sun.shadow.mapSize.set(SM,SM)}
-Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-9,far:40});
+Object.assign(sun.shadow.camera,{left:-7,right:7,top:8,bottom:-8,near:.5,far:40});sun.shadow.camera.updateProjectionMatrix();
 const ceilL=new THREE.PointLight(0xffecd2,0,14,2);ceilL.position.set(1.7,3,-6);Object.assign(ceilL.shadow,{bias:-.002,normalBias:.04,radius:4});ceilL.shadow.mapSize.set(1024,1024);ceilL.shadow.camera.near=.15;ceilL.shadow.camera.far=14;
 const fills=[[1.7,2.3,-3.9],[1.7,2.3,-8.2],[1.7,2.2,-1.5]].map(q=>{const l=new THREE.PointLight(0xffecd2,0,7,2);l.position.set(...q);return l});
-sun.shadow.radius=3;sun.shadow.bias=-.0003;sun.shadow.normalBias=.02;
+sun.shadow.radius=4;sun.shadow.bias=-.00015;sun.shadow.normalBias=.025;
 sc.environment=new THREE.PMREMGenerator(rd).fromScene(new RoomEnvironment(),.04).texture;sc.fog=new THREE.Fog(0x9cc8ee,30,90);
 const comp=new EffectComposer(rd,new THREE.WebGLRenderTarget(8,8,{type:THREE.HalfFloatType,samples:4}));comp.addPass(new RenderPass(sc,cam));
-const bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.5,.95);comp.addPass(bloom);comp.addPass(new OutputPass());
+const bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.08,.25,1.2);comp.addPass(bloom);comp.addPass(new OutputPass());
 sc.add(hemi,sun,ceilL,sun.target,...fills);sun.target.position.set(1.7,0,-5);
 const skyU={skyTop:{value:new THREE.Color()},skyHor:{value:new THREE.Color()}};
 sc.add(new THREE.Mesh(new THREE.SphereGeometry(150,32,16),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,fog:false,
@@ -87,8 +87,8 @@ function boxUV(o){let g=o.geometry;if(g.index)g=o.geometry=g.toNonIndexed();if(!
   if(ay>=ax&&ay>=az){uv[i*2]=v.z;uv[i*2+1]=v.x}else if(ax>=az){uv[i*2]=v.z;uv[i*2+1]=v.y}else{uv[i*2]=v.x;uv[i*2+1]=v.y}}
  g.setAttribute('uv',new THREE.BufferAttribute(uv,2))}
 function upgrade(o){const ms=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{const n=(m.name||'').replace(/^m_/,'');if(MM[n])return MM[n];let p;
- if(n==='glass')p=new THREE.MeshPhysicalMaterial({color:0xdcebf3,roughness:.05,metalness:0,transparent:true,opacity:.2,envMapIntensity:.45,depthWrite:false,specularIntensity:.6});
- else{const r=MR[n]||[.85,0];p=new THREE.MeshStandardMaterial({color:m.color,roughness:r[0],metalness:r[1],envMapIntensity:.5});
+ if(n==='glass')p=new THREE.MeshPhysicalMaterial({color:0xdcebf3,roughness:.16,metalness:0,transparent:true,opacity:.18,envMapIntensity:.22,depthWrite:false,specularIntensity:.3});
+ else{const r=MR[n]||[.85,0];p=new THREE.MeshStandardMaterial({color:m.color,roughness:r[0],metalness:r[1],envMapIntensity:.32});
   const t=TX[n];if(t){const k=t[0].clone();k.repeat.set(1/t[1],1/t[1]);k.needsUpdate=true;if(t[3])p.map=k;else{p.bumpMap=k;p.bumpScale=t[2]}}}
  p.name=n;p.shadowSide=THREE.DoubleSide;return MM[n]=p});o.material=ms.length>1?ms:ms[0];boxUV(o)}
 (function tufts(){const N=18000,g=new THREE.ConeGeometry(.012,.14,3);g.translate(0,.07,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({roughness:1}),N),d=new THREE.Object3D(),c=new THREE.Color();let i=0;
@@ -245,10 +245,10 @@ $('ar').onclick=()=>{if(sel){delete sel.userData.own;applyLight();$('ia').value=
 // ---------- lighting ----------
 function applyLight(){const n=+$('night').value,k=1-.6*ins,w=walking?1:0,C=h=>new THREE.Color(h);
  skyU.skyTop.value.set('#5a93d2').lerp(C('#02030a'),n);skyU.skyHor.value.set('#c4dcee').lerp(C('#0a0f1e'),n);sc.background=skyU.skyHor.value.clone();sc.fog.color.copy(skyU.skyHor.value);
- hemi.intensity=(.5*(1-n)+.035*n)*k;sc.environmentIntensity=(.3*(1-n)+.05*n)*(1-.65*ins);bloom.strength=.03+n*.45;
- sun.intensity=2.8*(1-n)+.04*n;sun.color.set('#fff0db').lerp(C('#ff9a55'),Math.max(0,1-Math.abs(n-.5)*3));
- ceilL.intensity=n*4.5+w*2.2*(1-n);fills.forEach(l=>l.intensity=n*1.1+w*.8*(1-n));if(fairyM)fairyM.emissiveIntensity=.6+n*3.5;rd.toneMappingExposure=.85+.3*ins*(1-n);
- items.forEach(g=>{const c=g.userData.own||accent;g.userData.am.forEach(m=>{m.emissive.copy(c);m.emissiveIntensity=1.2+n*1.5});g.userData.al.forEach(l=>{l.color.copy(l.userData.w?WARM:c);l.intensity=(.5+n*5)*l.userData.k})})}
+ hemi.intensity=(.38*(1-n)+.055*n)*k;sc.environmentIntensity=(.22*(1-n)+.08*n)*(1-.5*ins);bloom.strength=.055+n*.045;
+ sun.intensity=2.35*(1-n)+.03*n;sun.color.set('#fff0db').lerp(C('#ff9a55'),Math.max(0,1-Math.abs(n-.5)*3));
+ ceilL.intensity=n*2.2+w*1.35*(1-n);fills.forEach(l=>l.intensity=n*.65+w*.4*(1-n));if(fairyM)fairyM.emissiveIntensity=.3+n*.4;rd.toneMappingExposure=.8+.06*ins*(1-n);
+ items.forEach(g=>{const c=g.userData.own||accent;g.userData.am.forEach(m=>{m.emissive.copy(c);m.emissiveIntensity=.4+n*.35});g.userData.al.forEach(l=>{l.color.copy(l.userData.w?WARM:c);l.intensity=(.18+n*.8)*l.userData.k})})}
 $('wallc').oninput=e=>MM.wall_in&&MM.wall_in.color.set(e.target.value);$('cladc').oninput=e=>MM.cladding&&MM.cladding.color.set(e.target.value);$('night').oninput=applyLight;$('acc').oninput=e=>{accent=new THREE.Color(e.target.value);drawScreen();applyLight()};
 // ---------- save / load ----------
 const K='studio-layout-v2',wipe=()=>{items.slice().forEach(g=>{g.userData.cs&&sc.remove(g.userData.cs);sc.remove(g)});items.length=0;pick(null)};
