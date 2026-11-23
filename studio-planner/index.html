@@ -133,7 +133,7 @@ function ndc(e){const r=cv.getBoundingClientRect();ray.setFromCamera(new THREE.V
 cv.addEventListener('pointerdown',e=>{if(walking)return;ndc(e);const h=ray.intersectObjects(items,true)[0];
  if(h){let o=h.object;while(!items.includes(o))o=o.parent;pick(o);drag=o;ray.ray.intersectPlane(pl,pt);off.copy(o.position).sub(pt);off.y=0;oc.enabled=false;cv.setPointerCapture(e.pointerId)}else pick(null)});
 cv.addEventListener('pointermove',e=>{if(!drag)return;ndc(e);if(ray.ray.intersectPlane(pl,pt)){drag.position.x=pt.x+off.x;drag.position.z=pt.z+off.z;clampItem(drag)}});
-addEventListener('pointerup',()=>{drag=null;oc.enabled=true});
+addEventListener('pointerup',()=>{drag=null;if(!walking)oc.enabled=true});
 const rot=a=>{if(sel){sel.rotation.y+=a;clampItem(sel)}},del=()=>{if(sel){sc.remove(sel);items.splice(items.indexOf(sel),1);pick(null)}};
 $('r15').onclick=()=>rot(PI/12);$('r90').onclick=()=>rot(PI/2);$('del').onclick=del;
 $('dup').onclick=()=>{if(!sel)return;const u=sel.userData,g=add(u.type,sel.position.x+.3,sel.position.z+.3,sel.rotation.y,{e:u.elev,s:sel.scale.toArray(),c:u.col,a:u.own&&hex(u.own)});clampItem(g)};
@@ -191,28 +191,10 @@ addEventListener('keydown',e=>{if(!walking)return;const k=e.key.toLowerCase();if
  keys[{arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'}[k]||k]=1;if(e.key.startsWith('Arrow'))e.preventDefault()});
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys[{arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'}[k]||k]=0});
 document.querySelectorAll('#pad [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
-let lx=0,ly=0,look=false,lookPointer=null;
-// In walk mode, consume pointer input before OrbitControls can interpret a drag
-// as an orbit/pan. Mouse dragging is reserved for camera look, never movement.
-cv.addEventListener('pointerdown',e=>{
- if(!walking)return;
- e.preventDefault();e.stopImmediatePropagation();
- if(e.button!==0)return;
- look=true;lookPointer=e.pointerId;lx=e.clientX;ly=e.clientY;
- cv.setPointerCapture(e.pointerId);
-},true);
-cv.addEventListener('pointermove',e=>{
- if(!walking)return;
- e.stopImmediatePropagation();
- if(!look||e.pointerId!==lookPointer)return;
- yaw-=(e.clientX-lx)*.005;
- pitch=Math.max(-1.2,Math.min(1.2,pitch-(e.clientY-ly)*.005));
- lx=e.clientX;ly=e.clientY;
-},true);
-const endLook=e=>{if(e.pointerId===lookPointer){look=false;lookPointer=null}};
-addEventListener('pointerup',endLook,true);
-addEventListener('pointercancel',endLook,true);
-addEventListener('blur',()=>{look=false;lookPointer=null});
+let lx=0,ly=0,look=false;
+cv.addEventListener('pointerdown',e=>{if(walking){look=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)}});
+cv.addEventListener('pointermove',e=>{if(!walking||!look)return;yaw-=(e.clientX-lx)*.005;pitch=Math.max(-1.2,Math.min(1.2,pitch-(e.clientY-ly)*.005));lx=e.clientX;ly=e.clientY});
+addEventListener('pointerup',()=>look=false);
 function stepWalk(dt){const f=(keys.w?1:0)-(keys.s?1:0),r=(keys.d?1:0)-(keys.a?1:0),v=dt*(keys.shift?4:2);
  const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*v,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*v,p=cam.position;
  if(walkable(p.x+dx,p.z))p.x+=dx;if(walkable(p.x,p.z+dz))p.z+=dz;
